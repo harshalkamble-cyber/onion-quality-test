@@ -1,0 +1,27 @@
+groups:
+  - name: oniongrade-service-alerts
+    rules:
+      - alert: ApiHighErrorRate
+        expr: sum(rate(http_requests_total{service="onion-quality-api",status=~"5.."}[5m])) / clamp_min(sum(rate(http_requests_total{service="onion-quality-api"}[5m])), 1) > 0.03
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: API 5xx rate exceeds 3%
+      - alert: AiInferenceSlow
+        expr: histogram_quantile(0.95, sum(rate(ai_inference_duration_seconds_bucket[5m])) by (le)) > 2
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: AI p95 inference duration exceeds 2 seconds
+      - alert: ApiDown
+        expr: up{job="onion-api"} == 0
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: Onion quality API metrics endpoint is down
+      - alert: AiDown
+        expr: up{job="onion-ai"} == 0
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: Onion quality AI service metrics endpoint is down

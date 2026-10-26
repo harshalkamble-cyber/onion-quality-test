@@ -1,0 +1,35 @@
+digraph OnionGradeER {
+  graph [rankdir=LR, splines=polyline, nodesep=0.35, ranksep=0.55, pad=0.28, bgcolor="#fbfcf7", fontname="Arial", label="OnionGrade | Core Entity Relationship Diagram", labelloc=t, fontsize=22];
+  node [shape=record, style="filled", fontname="Arial", fontsize=9, color="#cbd6c2", fillcolor="#ffffff", fontcolor="#263323", margin="0.10,0.08"];
+  edge [fontname="Arial", fontsize=8, color="#78906a", arrowsize=0.65];
+  users [label="{users|PK id\lemail UNIQUE\lfull_name\lrole\lis_active\l}", fillcolor="#eff6e7"];
+  farmers [label="{farmers|PK/FK user_id\lfarm_name\lvillage, district, state\l}"];
+  scans [label="{scans|PK id\lFK user_id\lstatus, image_count\lonion_count, report\l}", fillcolor="#fff7df"];
+  images [label="{images|PK id\lFK scan_id\lstorage_key UNIQUE\lmime_type, byte_size\l}"];
+  preds [label="{ai_predictions|PK id\lFK scan_id, image_id\lonion_index, quality_stars\lconfidence, metrics, bbox\l}", fillcolor="#f1eafb"];
+  ratings [label="{ratings|PK id\lFK scan_id\lquality_stars\lonion_count, share_percent\l}"];
+  reports [label="{reports|PK id\lFK scan_id UNIQUE\lreport_data JSONB\lcreated_at\l}"];
+  tokens [label="{refresh_tokens|PK id\lFK user_id\ltoken_hash\lexpires_at, revoked_at\l}"];
+  notifications [label="{notifications|PK id\lFK user_id\ltitle, body, read_at\l}"];
+  feedback [label="{feedback|PK id\lFK user_id, scan_id?\lcategory, status, message\l}"];
+  logs [label="{activity_logs|PK id\lFK user_id?\laction, target, metadata\lcreated_at\l}"];
+  datasets [label="{dataset_assets|PK id\lFK uploaded_by\lstorage_key, image_count\llabel_state, dataset_version\l}"];
+  models [label="{model_versions|PK id\lversion, detector_hash\lclassifier_hash, status\lFK approved_by?\l}"];
+  jobs [label="{retraining_jobs|PK id\lFK requested_by\ldataset_version, status\lrequested_config, result_summary\l}"];
+  users -> farmers [label="1 : 0..1"];
+  users -> scans [label="1 : many"];
+  users -> tokens [label="1 : many"];
+  users -> notifications [label="1 : many"];
+  users -> feedback [label="1 : many"];
+  users -> logs [label="1 : many"];
+  users -> datasets [label="1 : many"];
+  users -> jobs [label="1 : many"];
+  users -> models [label="approves"];
+  scans -> images [label="1 : many"];
+  scans -> preds [label="1 : many"];
+  images -> preds [label="1 : many"];
+  scans -> ratings [label="1 : many"];
+  scans -> reports [label="1 : 0..1"];
+  scans -> feedback [label="optional"];
+  {rank=same; farmers; images; ratings; reports; tokens; notifications; feedback; logs; datasets; models; jobs;}
+}

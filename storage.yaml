@@ -1,0 +1,17 @@
+# Replace the storageClassName with a ReadWriteMany-capable class for your cloud:
+# AWS EFS CSI, Azure Files CSI, or Google Filestore CSI. This claim is shared by API and workers.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: { name: uploads-pvc, namespace: oniongrade }
+spec:
+  accessModes: [ReadWriteMany]
+  storageClassName: REPLACE_WITH_RWX_STORAGE_CLASS
+  resources: { requests: { storage: 100Gi } }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: { name: models-pvc, namespace: oniongrade }
+spec:
+  accessModes: [ReadWriteMany]
+  storageClassName: REPLACE_WITH_RWX_STORAGE_CLASS
+  resources: { requests: { storage: 30Gi } }

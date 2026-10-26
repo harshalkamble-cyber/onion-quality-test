@@ -1,0 +1,12 @@
+{
+  "name":"OnionGrade – Onion Quality Rating for Farmers",
+  "short_name":"OnionGrade",
+  "description":"AI-assisted visual onion quality assessment for farmers.",
+  "start_url":"/",
+  "display":"standalone",
+  "background_color":"#f7f8f0",
+  "theme_color":"#365b2b",
+  "orientation":"portrait",
+  "lang":"mr",
+  "icons":[{"src":"/icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
+}

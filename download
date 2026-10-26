@@ -1,0 +1,43 @@
+# Secrets and environment
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+certs/
+
+# Node / Next
+node_modules/
+.next/
+out/
+dist/
+coverage/
+npm-debug.log*
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+
+# Runtime state / data
+uploads/
+data/
+*.log
+
+# Model weights and datasets are versioned separately and should not be committed by default
+models/*.pt
+models/*.onnx
+models/*.engine
+models/datasets/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Local upload and development data
+/data/

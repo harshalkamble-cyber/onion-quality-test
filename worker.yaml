@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: worker, namespace: oniongrade }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: worker } }
+  template:
+    metadata: { labels: { app: worker } }
+    spec:
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: worker
+          image: ghcr.io/REPLACE_ORG/onion-quality-api:REPLACE_TAG
+          command: ["node","dist/worker.js"]
+          envFrom: [{ configMapRef: { name: oniongrade-config } }, { secretRef: { name: oniongrade-secret } }]
+          volumeMounts: [{ name: uploads, mountPath: /data/uploads }]
+          resources: { requests: { cpu: 250m, memory: 256Mi }, limits: { cpu: "2", memory: 1Gi } }
+          securityContext: { runAsNonRoot: true, runAsUser: 1001, allowPrivilegeEscalation: false, capabilities: { drop: ["ALL"] } }
+      volumes: [{ name: uploads, persistentVolumeClaim: { claimName: uploads-pvc } }]

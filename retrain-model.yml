@@ -1,0 +1,102 @@
+name: Retrain Onion Quality Models
+on:
+  workflow_dispatch:
+    inputs:
+      job_id:
+        description: Retraining request UUID from the admin console
+        required: true
+        type: string
+      dataset_version:
+        description: Dataset version to train against
+        required: true
+        type: string
+      epochs:
+        description: Training epochs
+        required: true
+        default: '80'
+        type: string
+      image_size:
+        description: Detector image size
+        required: true
+        default: '640'
+        type: string
+permissions:
+  contents: read
+  actions: read
+  id-token: write
+jobs:
+  train-and-validate:
+    # Configure a dedicated, patched runner with sufficient CPU/GPU and restricted data access.
+    runs-on: [self-hosted, linux, gpu]
+    timeout-minutes: 360
+    env:
+      JOB_ID: ${{ inputs.job_id }}
+      DATASET_VERSION: ${{ inputs.dataset_version }}
+      EPOCHS: ${{ inputs.epochs }}
+      IMAGE_SIZE: ${{ inputs.image_size }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - name: Report running
+        env:
+          CALLBACK_URL: ${{ secrets.RETRAIN_CALLBACK_API_URL }}
+          CALLBACK_TOKEN: ${{ secrets.ML_PIPELINE_CALLBACK_TOKEN }}
+        run: |
+          set -euo pipefail
+          curl --fail-with-body --silent --show-error -X PATCH "$CALLBACK_URL/internal/ml-jobs/$JOB_ID/status" \
+            -H 'Content-Type: application/json' -H "x-pipeline-token: $CALLBACK_TOKEN" \
+            -d "{\"status\":\"running\",\"pipelineRunId\":\"${GITHUB_RUN_ID}\"}"
+      - name: Install ML dependencies
+        run: python -m pip install --upgrade pip && pip install -r apps/ai/requirements.txt
+      - name: Download approved datasets
+        env:
+          DETECTOR_DATASET_URL: ${{ secrets.ONION_DETECTOR_DATASET_URL }}
+          CLASSIFIER_DATASET_URL: ${{ secrets.ONION_CLASSIFIER_DATASET_URL }}
+          DATASET_DOWNLOAD_TOKEN: ${{ secrets.DATASET_DOWNLOAD_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$DETECTOR_DATASET_URL" && test -n "$CLASSIFIER_DATASET_URL"
+          mkdir -p /tmp/onion-datasets/detector /tmp/onion-datasets/classifier
+          curl --fail --location --retry 3 -H "Authorization: Bearer $DATASET_DOWNLOAD_TOKEN" "$DETECTOR_DATASET_URL" -o /tmp/detector.tar.gz
+          curl --fail --location --retry 3 -H "Authorization: Bearer $DATASET_DOWNLOAD_TOKEN" "$CLASSIFIER_DATASET_URL" -o /tmp/classifier.tar.gz
+          tar -xzf /tmp/detector.tar.gz -C /tmp/onion-datasets/detector
+          tar -xzf /tmp/classifier.tar.gz -C /tmp/onion-datasets/classifier
+          test -f /tmp/onion-datasets/detector/data.yaml
+          test -d /tmp/onion-datasets/classifier/train/1_star
+          for grade in 1_star 2_star 3_star 4_star 5_star; do test -d "/tmp/onion-datasets/classifier/train/$grade" && test -d "/tmp/onion-datasets/classifier/val/$grade"; done
+      - name: Train detector
+        run: python apps/ai/train.py detector --data /tmp/onion-datasets/detector/data.yaml --base yolov8n.pt --epochs "$EPOCHS" --imgsz "$IMAGE_SIZE" --device 0 --project /tmp/onion-training
+      - name: Train classifier
+        run: python apps/ai/train.py classifier --data /tmp/onion-datasets/classifier --base yolov8n-cls.pt --epochs "$EPOCHS" --imgsz 224 --device 0 --project /tmp/onion-training
+      - name: Bundle candidate weights and hashes
+        run: |
+          set -euo pipefail
+          mkdir -p candidate
+          cp /tmp/onion-training/detector/weights/best.pt candidate/onion-detector.pt
+          cp /tmp/onion-training/classifier/weights/best.pt candidate/onion-quality-classifier.pt
+          sha256sum candidate/*.pt > candidate/SHA256SUMS
+          printf '{"dataset_version":"%s","run_id":"%s","detector_weights":"onion-detector.pt","classifier_weights":"onion-quality-classifier.pt","requires_manual_validation":true}\n' "$DATASET_VERSION" "$GITHUB_RUN_ID" > candidate/metadata.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: onion-quality-candidate-${{ inputs.dataset_version }}-${{ github.run_id }}
+          path: candidate/
+          retention-days: 30
+      - name: Mark request succeeded for artifact creation
+        if: success()
+        env:
+          CALLBACK_URL: ${{ secrets.RETRAIN_CALLBACK_API_URL }}
+          CALLBACK_TOKEN: ${{ secrets.ML_PIPELINE_CALLBACK_TOKEN }}
+        run: |
+          curl --fail-with-body --silent --show-error -X PATCH "$CALLBACK_URL/internal/ml-jobs/$JOB_ID/status" \
+            -H 'Content-Type: application/json' -H "x-pipeline-token: $CALLBACK_TOKEN" \
+            -d "{\"status\":\"succeeded\",\"pipelineRunId\":\"${GITHUB_RUN_ID}\",\"resultSummary\":{\"artifact\":\"onion-quality-candidate-${DATASET_VERSION}-${GITHUB_RUN_ID}\",\"manual_validation_required\":true}}"
+      - name: Mark request failed
+        if: failure()
+        env:
+          CALLBACK_URL: ${{ secrets.RETRAIN_CALLBACK_API_URL }}
+          CALLBACK_TOKEN: ${{ secrets.ML_PIPELINE_CALLBACK_TOKEN }}
+        run: |
+          curl --silent --show-error -X PATCH "$CALLBACK_URL/internal/ml-jobs/$JOB_ID/status" \
+            -H 'Content-Type: application/json' -H "x-pipeline-token: $CALLBACK_TOKEN" \
+            -d "{\"status\":\"failed\",\"pipelineRunId\":\"${GITHUB_RUN_ID}\",\"resultSummary\":{\"message\":\"Training workflow failed; inspect restricted runner logs.\"}}" || true

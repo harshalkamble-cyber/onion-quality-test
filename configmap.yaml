@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: oniongrade-config
+  namespace: oniongrade
+data:
+  NODE_ENV: "production"
+  ENVIRONMENT: "production"
+  PORT: "4000"
+  WEB_ORIGIN: "https://oniongrade.example.org"
+  COOKIE_SECURE: "true"
+  TRUST_PROXY: "true"
+  AI_SERVICE_URL: "http://ai:8000"
+  UPLOAD_DIR: "/data/uploads"
+  MAX_UPLOAD_BYTES: "15728640"
+  MAX_SCAN_BYTES: "104857600"
+  MAX_FILES_PER_SCAN: "30"
+  AI_REQUEST_TIMEOUT_MS: "90000"
+  SCAN_WORKER_CONCURRENCY: "2"
+  DETECTOR_WEIGHTS_PATH: "/models/onion-detector.pt"
+  CLASSIFIER_WEIGHTS_PATH: "/models/onion-quality-classifier.pt"
+  MODEL_VERSION: "onion-quality-v1"
+  DEVICE: "auto"
+  CONFIDENCE_THRESHOLD: "0.25"
+  MAX_IMAGES_PER_REQUEST: "30"

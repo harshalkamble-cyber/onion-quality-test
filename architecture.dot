@@ -1,0 +1,36 @@
+digraph OnionGradeArchitecture {
+  graph [rankdir=TB, splines=ortho, nodesep=0.42, ranksep=0.62, pad=0.25, bgcolor="#fbfcf7", fontname="Arial", label="OnionGrade | Production Architecture", labelloc=t, fontsize=22];
+  node [shape=box, style="rounded,filled", fontname="Arial", fontsize=10, color="#cbd6c2", fillcolor="#ffffff", fontcolor="#263323", margin="0.16,0.10"];
+  edge [fontname="Arial", fontsize=8, color="#78906a", arrowsize=0.7];
+  farmer [label="Farmer / Admin\nMobile browser + PWA", fillcolor="#eff6e7"];
+  edgeLayer [label="CDN / WAF / TLS\nHTTPS Load Balancer", fillcolor="#edf2e8"];
+  web [label="Next.js Web\nResponsive UI · i18n · Offline Queue", fillcolor="#ffffff"];
+  api [label="Express + TypeScript API\nJWT / CSRF / RBAC / REST / Swagger", fillcolor="#ffffff"];
+  queue [label="Redis + BullMQ\nAsynchronous scan queue", fillcolor="#fff7df"];
+  worker [label="Scan worker replicas\nValidate · orchestrate · persist", fillcolor="#ffffff"];
+  pg [shape=cylinder, label="PostgreSQL\nUsers · Scans · Reports\nPredictions · Audit · Feedback", fillcolor="#eef4fb"];
+  storage [shape=cylinder, label="Encrypted image storage\nObject store / RWX volume", fillcolor="#eef4fb"];
+  ai [label="Private FastAPI AI service\nYOLO detector + grade classifier\nOpenCV visual descriptors", fillcolor="#f1eafb"];
+  weights [shape=cylinder, label="Versioned validated weights\nRead-only model artifacts", fillcolor="#f1eafb"];
+  metrics [label="Prometheus / Grafana / Alerts\nStructured logs + dashboards", fillcolor="#f5f5f3"];
+  ci [label="GitHub Actions CI/CD\nTests · builds · controlled training", fillcolor="#f5f5f3"];
+  farmer -> edgeLayer;
+  edgeLayer -> web;
+  edgeLayer -> api;
+  web -> api [label="/api"];
+  api -> pg;
+  api -> storage;
+  api -> queue;
+  worker -> queue;
+  worker -> storage;
+  worker -> pg;
+  worker -> ai [label="private token"];
+  ai -> weights;
+  {rank=same; web; api;}
+  {rank=same; pg; queue; storage;}
+  {rank=same; metrics; ci;}
+  api -> metrics [style=dashed, constraint=false];
+  worker -> metrics [style=dashed, constraint=false];
+  ai -> metrics [style=dashed, constraint=false];
+  ci -> weights [style=dashed, label="reviewed release", constraint=false];
+}

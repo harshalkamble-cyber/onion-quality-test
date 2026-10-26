@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: Service
+metadata: { name: web, namespace: oniongrade }
+spec:
+  selector: { app: web }
+  ports: [{ name: http, port: 3000, targetPort: 3000 }]
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: web, namespace: oniongrade }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: web } }
+  template:
+    metadata: { labels: { app: web } }
+    spec:
+      containers:
+        - name: web
+          image: ghcr.io/REPLACE_ORG/onion-quality-web:REPLACE_TAG
+          ports: [{ containerPort: 3000 }]
+          env: [{ name: NODE_ENV, value: production }, { name: PORT, value: "3000" }]
+          resources: { requests: { cpu: 200m, memory: 256Mi }, limits: { cpu: "2", memory: 1Gi } }
+          readinessProbe: { httpGet: { path: /, port: 3000 }, initialDelaySeconds: 20, periodSeconds: 10 }
+          livenessProbe: { httpGet: { path: /, port: 3000 }, initialDelaySeconds: 30, periodSeconds: 20 }
+          securityContext: { runAsNonRoot: true, runAsUser: 1001, allowPrivilegeEscalation: false, capabilities: { drop: ["ALL"] } }
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: { name: web, namespace: oniongrade }
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: web }
+  minReplicas: 2
+  maxReplicas: 8
+  metrics:
+    - type: Resource
+      resource: { name: cpu, target: { type: Utilization, averageUtilization: 70 } }

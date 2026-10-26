@@ -1,0 +1,14 @@
+rule_files:
+  - /etc/prometheus/alerts.yml
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+scrape_configs:
+  - job_name: onion-api
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['api:4000']
+  - job_name: onion-ai
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['ai:8000']

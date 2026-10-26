@@ -1,0 +1,211 @@
+openapi: 3.0.3
+info:
+  title: Onion Quality Rating API
+  version: 1.0.0
+  description: REST API for farmer authentication, asynchronous onion quality scans, reports, dashboard, feedback, and administration.
+servers:
+  - url: /api
+security:
+  - cookieAuth: []
+paths:
+  /auth/register:
+    post:
+      tags: [Authentication]
+      summary: Register a farmer
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fullName, email, password]
+              properties:
+                fullName: {type: string, minLength: 2, maxLength: 120}
+                email: {type: string, format: email}
+                password: {type: string, minLength: 10, maxLength: 128}
+                phone: {type: string, maxLength: 20}
+                language: {type: string, enum: [en, hi, mr], default: mr}
+      responses:
+        '201': {description: Account created and session cookies set}
+        '409': {description: Email already exists}
+  /auth/login:
+    post:
+      tags: [Authentication]
+      summary: Sign in
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: {type: string, format: email}
+                password: {type: string}
+      responses:
+        '200': {description: Session cookies set and CSRF token returned}
+        '401': {description: Invalid credentials}
+  /auth/refresh:
+    post:
+      tags: [Authentication]
+      summary: Rotate refresh token and issue new access cookie
+      responses:
+        '200': {description: Refreshed}
+        '401': {description: Refresh token absent, expired or revoked}
+  /auth/logout:
+    post:
+      tags: [Authentication]
+      summary: Revoke refresh token and clear cookies
+      responses:
+        '204': {description: Logged out}
+  /auth/me:
+    get:
+      tags: [Authentication]
+      summary: Get current account
+      responses:
+        '200': {description: Current account}
+        '401': {description: Unauthenticated}
+  /scans:
+    post:
+      tags: [Scans]
+      summary: Create an asynchronous scan
+      description: Multipart upload. Maximum 30 images, 15 MiB per image and 100 MiB per batch by default.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [images]
+              properties:
+                source: {type: string, enum: [upload, camera, bulk]}
+                images:
+                  type: array
+                  maxItems: 30
+                  items: {type: string, format: binary}
+      responses:
+        '202': {description: Scan queued}
+        '400': {description: Invalid request}
+        '413': {description: Batch too large}
+        '415': {description: Unsupported file type}
+        '401': {description: Unauthenticated}
+    get:
+      tags: [Scans]
+      summary: List the current farmer's scans
+      parameters:
+        - in: query
+          name: limit
+          schema: {type: integer, minimum: 1, maximum: 100, default: 20}
+        - in: query
+          name: offset
+          schema: {type: integer, minimum: 0, default: 0}
+      responses:
+        '200': {description: Scan history}
+  /scans/{scanId}:
+    get:
+      tags: [Scans]
+      summary: Fetch scan status and result
+      parameters:
+        - in: path
+          name: scanId
+          required: true
+          schema: {type: string, format: uuid}
+      responses:
+        '200': {description: Scan, images, individual predictions and grade groups}
+        '404': {description: Scan not found or not owned by current user}
+  /scans/{scanId}/report.csv:
+    get:
+      tags: [Scans]
+      summary: Export a completed report to CSV
+      parameters:
+        - in: path
+          name: scanId
+          required: true
+          schema: {type: string, format: uuid}
+      responses:
+        '200': {description: CSV file, content: {text/csv: {schema: {type: string, format: binary}}}}
+        '404': {description: Completed report not found}
+  /dashboard/summary:
+    get:
+      tags: [Dashboard]
+      summary: Farmer scan totals, activity trend, distribution and recent scans
+      responses:
+        '200': {description: Dashboard summary}
+  /feedback:
+    post:
+      tags: [Feedback]
+      summary: Submit feedback about the app or a scan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message]
+              properties:
+                message: {type: string, minLength: 4, maxLength: 4000}
+                rating: {type: integer, minimum: 1, maximum: 5}
+                category: {type: string, enum: [accuracy, usability, bug, support, general]}
+                scanId: {type: string, format: uuid}
+      responses:
+        '201': {description: Feedback recorded}
+  /notifications:
+    get:
+      tags: [Notifications]
+      summary: List current farmer's notifications
+      responses:
+        '200': {description: Notifications}
+  /admin/overview:
+    get:
+      tags: [Admin]
+      summary: Aggregate platform and model readiness metrics
+      responses:
+        '200': {description: Admin overview}
+        '403': {description: Admin or inspector role required}
+  /admin/users:
+    get:
+      tags: [Admin]
+      summary: List users and scan counts
+      responses:
+        '200': {description: User list}
+  /admin/datasets:
+    get:
+      tags: [Admin]
+      summary: List dataset asset metadata and label review states
+      responses:
+        '200': {description: Dataset assets}
+    post:
+      tags: [Admin]
+      summary: Register a pre-uploaded dataset asset by storage key
+      responses:
+        '201': {description: Dataset asset registered}
+  /admin/model-versions:
+    get:
+      tags: [Admin]
+      summary: List registered model metadata and review status
+      responses:
+        '200': {description: Model registry records}
+    post:
+      tags: [Admin]
+      summary: Register a candidate model and hashes
+      responses:
+        '201': {description: Candidate recorded}
+  /admin/retraining:
+    get:
+      tags: [Admin]
+      summary: List retraining jobs
+      responses:
+        '200': {description: Retraining jobs}
+    post:
+      tags: [Admin]
+      summary: Request model retraining through configured GitHub Actions workflow
+      responses:
+        '202': {description: Training request saved and optionally dispatched}
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: access_token
